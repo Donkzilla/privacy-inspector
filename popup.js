@@ -251,144 +251,143 @@ async function fallbackDeleteCookie(cookieName, tab) {
     });
 }
 
-// Nuclear option - tries to break regeneration cycles
-async function nuclearOption() {
-    try {
-        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        
-        if (!confirm(`☢️ NUCLEAR OPTION\n\nThis will:\n• Clear ALL storage repeatedly\n• Try to disable regeneration scripts\n• May break site functionality\n• Requires page reload\n\nContinue?`)) {
-            return;
-        }
-
-        // Step 1: Multiple rapid clear cycles
-        for (let i = 0; i < 3; i++) {
-            await clearAllStorage();
-            await new Promise(resolve => setTimeout(resolve, 100)); // Small delay
-        }
-
-        // Step 2: Try to inject script to break regeneration
-        await chrome.scripting.executeScript({
-            target: { tabId: tab.id },
-            function: () => {
-                // Try to disrupt common regeneration patterns
-                const originalSetItem = localStorage.setItem;
-                const originalGetItem = localStorage.getItem;
-                
-                // Temporarily break localStorage
-                localStorage.setItem = function() {
-                    console.log('🚫 Storage set blocked by Privacy Inspector');
-                    return false;
-                };
-                
-                // Override common tracking functions
-                const trackers = [
-                    'dataLayer',
-                    'ga',
-                    'gtag',
-                    'fbq',
-                    '_gat',
-                    '_ga'
-                ];
-                
-                trackers.forEach(tracker => {
-                    if (window[tracker]) {
-                        window[tracker] = function() {
-                            console.log(`🚫 ${tracker} blocked by Privacy Inspector`);
-                        };
-                    }
-                });
-
-                // Set a flag to indicate nuclear cleanup
-                sessionStorage.setItem('_pi_nuclear_cleanup', 'true');
-                
-                console.log('☢️ Nuclear cleanup activated');
-            }
-        });
-
-        // Step 3: Force page reload to break persistent scripts
-        if (confirm('Nuclear cleanup complete! Reload the page to see results?')) {
-            chrome.tabs.reload(tab.id);
-        }
-
-    } catch (error) {
-        console.error('❌ Nuclear option failed:', error);
-        alert('Nuclear option failed: ' + error.message);
-    }
-}
-
-// Add event listener in setupActionListeners()
-document.getElementById('nuclear-btn').addEventListener('click', nuclearOption);
 
 async function clearAllStorage() {
     try {
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        const url = new URL(tab.url);
-        const domain = url.hostname;
         
-        // Clear localStorage and sessionStorage
+        if (!confirm('🚨 Clear ALL storage (localStorage, sessionStorage, cookies) for this site?\n\nThis will log you out and reset all site preferences!')) {
+            return;
+        }
+
+        // Show loading state
+        const clearBtn = document.getElementById('clear-all-btn');
+        const originalText = clearBtn.textContent;
+        clearBtn.textContent = '⏳ Clearing...';
+        clearBtn.disabled = true;
+
+        let successCount = 0;
+        let totalItems = 0;
+
+        // Step 1: Get current data to know what we're deleting
+        const results = await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            function: getStorageData
+        });
+
+        if (results[0].result) {
+            const data = results[0].result;
+            
+            // Count total items
+            totalItems = Object.keys(data.local).length + 
+                        Object.keys(data.session).length + 
+                        Object.keys(data.cookies).length;
+
+            // Step 2: Delete localStorage items one by one
+            for (const key of Object.keys(data.local)) {
+                const success = await deleteIndividualItem('local', key, tab);
+                if (success) successCount++;
+                await new Promise(resolve => setTimeout(resolve, 10)); // Small delay
+            }
+
+            // Step 3: Delete sessionStorage items one by one  
+            for (const key of Object.keys(data.session)) {
+                const success = await deleteIndividualItem('session', key, tab);
+                if (success) successCount++;
+                await new Promise(resolve => setTimeout(resolve, 10));
+            }
+
+            // Step 4: Delete cookies one by one (most reliable method)
+            for (const key of Object.keys(data.cookies)) {
+                const success = await deleteIndividualItem('cookies', key, tab);
+                if (success) successCount++;
+                await new Promise(resolve => setTimeout(resolve, 50)); // Longer delay for cookies
+            }
+        }
+
+        // Step 5: Final cleanup pass
         await chrome.scripting.executeScript({
             target: { tabId: tab.id },
             function: () => {
                 localStorage.clear();
                 sessionStorage.clear();
-                console.log('🗑️ Cleared localStorage and sessionStorage');
             }
         });
-        
-        // Clear ALL cookies for this domain using Chrome API
-        const allCookies = await chrome.cookies.getAll({ domain: domain });
-        console.log(`🍪 Found ${allCookies.length} cookies to delete`);
-        
-        let deletedCount = 0;
-        for (const cookie of allCookies) {
-            try {
-                const removed = await chrome.cookies.remove({
-                    url: (cookie.secure ? 'https://' : 'http://') + cookie.domain + cookie.path,
-                    name: cookie.name
-                });
-                if (removed) deletedCount++;
-            } catch (error) {
-                console.error(`Failed to delete cookie: ${cookie.name}`, error);
-            }
-        }
-        
-        // Also try broader domain patterns
-        const domainPatterns = [
-            domain,
-            '.' + domain,
-            'www.' + domain
-        ];
-        
-        for (const pattern of domainPatterns) {
-            const patternCookies = await chrome.cookies.getAll({ domain: pattern });
-            for (const cookie of patternCookies) {
-                try {
-                    const removed = await chrome.cookies.remove({
-                        url: (cookie.secure ? 'https://' : 'http://') + cookie.domain + cookie.path,
-                        name: cookie.name
-                    });
-                    if (removed) deletedCount++;
-                } catch (error) {
-                    // Continue
-                }
-            }
-        }
-        
-        console.log(`✅ Deleted ${deletedCount} cookies`);
-        
+
+        // Restore button state
+        clearBtn.textContent = originalText;
+        clearBtn.disabled = false;
+
         // Refresh and show results
         loadStorageData();
-        
-        // Show success message
-        if (deletedCount > 0) {
-            alert(`✅ Successfully cleared storage and deleted ${deletedCount} cookies!`);
+
+        // Show detailed results
+        if (successCount > 0) {
+            alert(`✅ Successfully cleared ${successCount} out of ${totalItems} items!\n\nSome items may regenerate automatically.`);
         } else {
-            alert('✅ Storage cleared, but no deletable cookies found.');
+            alert('❌ No items could be cleared. The site may be protecting its data.');
         }
-        
+
     } catch (error) {
         console.error('❌ Clear all error:', error);
+        
+        // Restore button state on error
+        const clearBtn = document.getElementById('clear-all-btn');
+        clearBtn.textContent = '🗑️ Clear All';
+        clearBtn.disabled = false;
+        
         alert('Error clearing storage: ' + error.message);
+    }
+}
+
+// Helper function for individual item deletion
+async function deleteIndividualItem(storageType, key, tab) {
+    try {
+        if (storageType === 'cookies') {
+            // Use the reliable individual cookie deletion
+            const url = new URL(tab.url);
+            const domain = url.hostname;
+            
+            const details = {
+                name: key,
+                url: tab.url
+            };
+            
+            try {
+                const removed = await chrome.cookies.remove(details);
+                if (removed) {
+                    console.log(`✅ Deleted cookie: ${key}`);
+                    return true;
+                } else {
+                    // Try alternative methods
+                    const success = await deleteCookieAllMethods(key, domain, tab.url);
+                    return success;
+                }
+            } catch (error) {
+                console.error(`❌ Chrome API failed for ${key}:`, error);
+                await fallbackDeleteCookie(key, tab);
+                return true; // Assume success for fallback
+            }
+            
+        } else {
+            // localStorage and sessionStorage
+            await chrome.scripting.executeScript({
+                target: { tabId: tab.id },
+                function: (type, itemKey) => {
+                    if (type === 'local') {
+                        localStorage.removeItem(itemKey);
+                    } else if (type === 'session') {
+                        sessionStorage.removeItem(itemKey);
+                    }
+                },
+                args: [storageType, key]
+            });
+            console.log(`✅ Deleted ${storageType} item: ${key}`);
+            return true;
+        }
+    } catch (error) {
+        console.error(`❌ Failed to delete ${storageType} item ${key}:`, error);
+        return false;
     }
 }
 
