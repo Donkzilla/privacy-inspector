@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "Privacy Inspector",
+  "version": "1.0",
+  "description": "See what websites secretly store about you - view tracking data, delete cookies, protect your privacy",
+  "permissions": [
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://*/*",
+    "http://*/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "See what this site stores about you"
+  },
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
+  "author": "Robert Campbell"
+}

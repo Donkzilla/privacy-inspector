@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            width: 500px;
+            margin: 0;
+            font-family: Arial, sans-serif;
+        }
+        .header {
+            background: #667eea;
+            color: white;
+            padding: 15px;
+            text-align: center;
+        }
+        .brand {
+            padding: 8px;
+            background: #f5f5f5;
+            border-bottom: 1px solid #ddd;
+            text-align: center;
+            font-size: 11px;
+            color: #666;
+        }
+        .brand a {
+            color: #667eea;
+            text-decoration: none;
+        }
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid #ddd;
+        }
+        .tab {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            background: #f5f5f5;
+            cursor: pointer;
+        }
+        .tab.active {
+            background: white;
+            border-bottom: 2px solid #667eea;
+        }
+        .content {
+            padding: 15px;
+            max-height: 350px;
+            overflow-y: auto;
+        }
+        .item {
+            border: 1px solid #ddd;
+            margin: 5px 0;
+            padding: 10px;
+            border-radius: 4px;
+            position: relative;
+        }
+        .key {
+            font-weight: bold;
+            word-break: break-all;
+            padding-right: 60px;
+        }
+        .value {
+            color: #666;
+            font-size: 12px;
+            word-break: break-all;
+            margin: 5px 0;
+        }
+        .meta {
+            font-size: 11px;
+            color: #888;
+        }
+        .image-preview {
+            max-width: 100px;
+            max-height: 100px;
+            cursor: pointer;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+        }
+        .delete-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 4px 8px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 10px;
+        }
+        .delete-btn:hover {
+            background: #c0392b;
+        }
+        .actions {
+            padding: 10px;
+            background: #f5f5f5;
+            border-top: 1px solid #ddd;
+            display: flex;
+            gap: 10px;
+        }
+        .action-btn {
+            flex: 1;
+            padding: 8px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .refresh {
+            background: #3498db;
+            color: white;
+        }
+        .refresh:hover {
+            background: #2980b9;
+        }
+        .clear-all {
+            background: #e74c3c;
+            color: white;
+        }
+        .clear-all:hover {
+            background: #c0392b;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            z-index: 1000;
+        }
+        .modal-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            max-width: 90%;
+            max-height: 90%;
+        }
+        .modal-img {
+            max-width: 100%;
+            max-height: 80vh;
+        }
+        .close {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            cursor: pointer;
+            border-radius: 3px;
+        }
+        .footer {
+            padding: 8px;
+            text-align: center;
+            font-size: 10px;
+            color: #666;
+            border-top: 1px solid #ddd;
+        }
+        .footer a {
+            color: #667eea;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h3 style="margin:0;">🔍 Privacy Inspector</h3>
+        <div id="site-name">Loading...</div>
+    </div>
+
+    <div class="brand">
+        Created by <strong>Robert Campbell</strong> | 
+        <a href="https://github.com/Donkzilla/privacy-inspector" target="_blank">Fork on GitHub</a> | 
+        <a href="privacy.html" target="_blank">Privacy</a>
+    </div>
+
+    <div class="tabs">
+        <button class="tab active" data-tab="local">Local</button>
+        <button class="tab" data-tab="session">Session</button>
+        <button class="tab" data-tab="cookies">Cookies</button>
+    </div>
+
+    <div class="content" id="content">
+        <div id="local-content"></div>
+        <div id="session-content" style="display:none;"></div>
+        <div id="cookies-content" style="display:none;"></div>
+    </div>
+
+    <div class="actions">
+        <button class="action-btn refresh" id="refresh-btn">🔄 Refresh</button>
+        <button class="action-btn clear-all" id="clear-all-btn">🗑️ Clear All</button>
+    </div>
+
+    <div class="footer">
+        GPL v3 - Your data belongs to YOU
+    </div>
+
+    <div id="image-modal" class="modal">
+        <div class="modal-content">
+            <button class="close" onclick="closeModal()">×</button>
+            <img class="modal-img" id="modal-image" src="" alt="Preview">
+        </div>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+</html>
