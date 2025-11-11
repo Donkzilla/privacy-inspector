@@ -251,6 +251,74 @@ async function fallbackDeleteCookie(cookieName, tab) {
     });
 }
 
+// Nuclear option - tries to break regeneration cycles
+async function nuclearOption() {
+    try {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        
+        if (!confirm(`☢️ NUCLEAR OPTION\n\nThis will:\n• Clear ALL storage repeatedly\n• Try to disable regeneration scripts\n• May break site functionality\n• Requires page reload\n\nContinue?`)) {
+            return;
+        }
+
+        // Step 1: Multiple rapid clear cycles
+        for (let i = 0; i < 3; i++) {
+            await clearAllStorage();
+            await new Promise(resolve => setTimeout(resolve, 100)); // Small delay
+        }
+
+        // Step 2: Try to inject script to break regeneration
+        await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            function: () => {
+                // Try to disrupt common regeneration patterns
+                const originalSetItem = localStorage.setItem;
+                const originalGetItem = localStorage.getItem;
+                
+                // Temporarily break localStorage
+                localStorage.setItem = function() {
+                    console.log('🚫 Storage set blocked by Privacy Inspector');
+                    return false;
+                };
+                
+                // Override common tracking functions
+                const trackers = [
+                    'dataLayer',
+                    'ga',
+                    'gtag',
+                    'fbq',
+                    '_gat',
+                    '_ga'
+                ];
+                
+                trackers.forEach(tracker => {
+                    if (window[tracker]) {
+                        window[tracker] = function() {
+                            console.log(`🚫 ${tracker} blocked by Privacy Inspector`);
+                        };
+                    }
+                });
+
+                // Set a flag to indicate nuclear cleanup
+                sessionStorage.setItem('_pi_nuclear_cleanup', 'true');
+                
+                console.log('☢️ Nuclear cleanup activated');
+            }
+        });
+
+        // Step 3: Force page reload to break persistent scripts
+        if (confirm('Nuclear cleanup complete! Reload the page to see results?')) {
+            chrome.tabs.reload(tab.id);
+        }
+
+    } catch (error) {
+        console.error('❌ Nuclear option failed:', error);
+        alert('Nuclear option failed: ' + error.message);
+    }
+}
+
+// Add event listener in setupActionListeners()
+document.getElementById('nuclear-btn').addEventListener('click', nuclearOption);
+
 async function clearAllStorage() {
     try {
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
