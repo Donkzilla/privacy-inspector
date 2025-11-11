@@ -4,9 +4,39 @@
     <meta charset="UTF-8">
     <title>Privacy Policy - Privacy Inspector</title>
     <style>
-        body { font-family: Arial, sans-serif; max-width: 600px; margin: 20px auto; padding: 20px; }
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 600px; 
+            margin: 20px auto; 
+            padding: 20px;
+            line-height: 1.6;
+        }
         h1 { color: #667eea; }
-        .back { margin-top: 20px; }
+        h2 { color: #333; margin-top: 25px; }
+        ul { padding-left: 20px; }
+        li { margin-bottom: 8px; }
+        .back { 
+            margin-top: 30px; 
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+        }
+        .back a {
+            display: inline-block;
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .back a:hover {
+            background: #5a6fd8;
+        }
+        .contact {
+            margin-top: 20px;
+            font-size: 14px;
+            color: #666;
+        }
     </style>
 </head>
 <body>
@@ -21,20 +51,46 @@
         <li>❌ No analytics</li>
         <li>❌ No external servers</li>
         <li>❌ No data sharing</li>
+        <li>❌ No telemetry</li>
     </ul>
 
     <h2>How It Works:</h2>
     <ul>
         <li>✅ All processing happens locally in your browser</li>
-        <li>✅ No internet connection required</li>
+        <li>✅ No internet connection required after installation</li>
         <li>✅ All data stays on your device</li>
-        <li>✅ Open source - <a href="https://github.com/Donkzilla/privacy-inspector">view the code</a></li>
+        <li>✅ Open source - <a href="https://github.com/Donkzilla/privacy-inspector" target="_blank">view the code</a></li>
+        <li>✅ Only accesses data when you click the extension icon</li>
+        <li>✅ Only sees the specific tab you're viewing</li>
     </ul>
 
-    <p>This extension only accesses website storage data when you actively click the extension icon, and only for the specific tab you're viewing.</p>
-    <p>Contact: robert@robertcampbell.com.au</p>
-    <div class="back">
-        <a href="javascript:window.close()">← Back to Privacy Inspector</a>
+    <h2>Permissions Explained:</h2>
+    <ul>
+        <li><strong>"activeTab"</strong> - Lets us see the website you're currently viewing</li>
+        <li><strong>"scripting"</strong> - Allows us to read that site's storage data</li>
+        <li><strong>No other permissions</strong> - We can't see your browsing history, passwords, or other tabs</li>
+    </ul>
+
+    <div class="contact">
+        <strong>Contact:</strong><br>
+        Robert Campbell<br>
+        GitHub: <a href="https://github.com/Donkzilla/privacy-inspector" target="_blank">Donkzilla/privacy-inspector</a>
     </div>
+
+    <div class="back">
+        <a href="#" onclick="window.close(); return false;">← Close This Tab</a>
+    </div>
+
+    <script>
+        // Alternative close method for browsers that block window.close()
+        document.querySelector('.back a').addEventListener('click', function(e) {
+            e.preventDefault();
+            window.close();
+            // If window.close doesn't work, at least go back in history
+            if (!window.closed) {
+                window.history.back();
+            }
+        });
+    </script>
 </body>
 </html>
