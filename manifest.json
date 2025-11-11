@@ -5,7 +5,8 @@
   "description": "See what websites secretly store about you - view tracking data, delete cookies, protect your privacy",
   "permissions": [
     "activeTab",
-    "scripting"
+    "scripting",
+    "cookies"
   ],
   "host_permissions": [
     "https://*/*",
@@ -22,7 +23,7 @@
   },
   "author": "Robert Campbell",
   "web_accessible_resources": [{
-    "resources": ["privacy.html"],
+    "resources": ["privacy.html", "privacy.js"],
     "matches": ["<all_urls>"]
   }]
 }
