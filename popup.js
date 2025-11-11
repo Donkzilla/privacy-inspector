@@ -73,11 +73,11 @@ function getStorageData() {
         data.session[key] = sessionStorage.getItem(key);
     }
 
-    // Cookies
+    // Cookies - Enhanced parsing
     document.cookie.split(';').forEach(cookie => {
-        const [key, value] = cookie.split('=').map(s => s.trim());
+        const [key, ...valueParts] = cookie.split('=').map(s => s.trim());
         if (key) {
-            data.cookies[key] = value || '';
+            data.cookies[key] = valueParts.join('=').trim() || '';
         }
     });
 
@@ -100,10 +100,16 @@ function displayStorageType(type, items) {
         for (const [key, value] of Object.entries(items)) {
             const isImage = value && value.startsWith('data:image/');
             
+            // Check if cookie might be HttpOnly (empty value often indicates HttpOnly)
+            const isHttpOnly = type === 'cookies' && value === '';
+            
             html += `
                 <div class="item">
-                    <button class="delete-btn" data-type="${type}" data-key="${escapeHtml(key)}">×</button>
-                    <div class="key">${escapeHtml(key)}</div>
+                    <button class="delete-btn" data-type="${type}" data-key="${escapeHtml(key)}" 
+                            ${isHttpOnly ? 'title="HttpOnly cookie - may not be deletable"' : ''}>
+                        ×
+                    </button>
+                    <div class="key">${escapeHtml(key)} ${isHttpOnly ? '🔒' : ''}</div>
                     <div class="value">
                         ${isImage ? 
                             `<img src="${value}" class="image-preview" onclick="openImage('${value.replace(/'/g, "\\'")}')">` : 
@@ -112,6 +118,7 @@ function displayStorageType(type, items) {
                     </div>
                     <div class="meta">
                         ${isImage ? '🖼️ Image' : '📄 Text'} • ${(value || '').length} chars
+                        ${isHttpOnly ? '• 🔒 HttpOnly' : ''}
                     </div>
                 </div>
             `;
@@ -137,56 +144,182 @@ async function deleteStorageItem(storageType, key) {
     try {
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
         
-        await chrome.scripting.executeScript({
-            target: { tabId: tab.id },
-            function: (type, itemKey) => {
-                if (type === 'local') {
-                    localStorage.removeItem(itemKey);
-                } else if (type === 'session') {
-                    sessionStorage.removeItem(itemKey);
-                } else if (type === 'cookies') {
-                    document.cookie = `${itemKey}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+        if (storageType === 'cookies') {
+            // Use Chrome Cookies API for cookies
+            const url = new URL(tab.url);
+            const domain = url.hostname;
+            
+            // Try to delete the cookie using Chrome API
+            const details = {
+                name: key,
+                url: tab.url
+            };
+            
+            try {
+                const removed = await chrome.cookies.remove(details);
+                
+                if (removed) {
+                    console.log(`✅ Successfully deleted cookie: ${key}`);
+                    loadStorageData();
+                } else {
+                    // If that didn't work, try with different domain patterns
+                    console.log(`🔄 Trying alternative methods for: ${key}`);
+                    await deleteCookieAllMethods(key, domain, tab.url);
+                    loadStorageData();
                 }
-            },
-            args: [storageType, key]
-        });
-
-        // Refresh the data
-        loadStorageData();
+            } catch (error) {
+                console.error(`❌ Chrome API failed for ${key}:`, error);
+                // Fallback to legacy method
+                await fallbackDeleteCookie(key, tab);
+                loadStorageData();
+            }
+            
+        } else {
+            // Original localStorage/sessionStorage deletion code
+            await chrome.scripting.executeScript({
+                target: { tabId: tab.id },
+                function: (type, itemKey) => {
+                    if (type === 'local') {
+                        localStorage.removeItem(itemKey);
+                    } else if (type === 'session') {
+                        sessionStorage.removeItem(itemKey);
+                    }
+                },
+                args: [storageType, key]
+            });
+            loadStorageData();
+        }
         
     } catch (error) {
+        console.error('❌ Delete error:', error);
         alert('Error deleting item: ' + error.message);
     }
+}
+
+async function deleteCookieAllMethods(cookieName, domain, url) {
+    // Try multiple deletion strategies
+    const deletionAttempts = [
+        // Standard deletion
+        { name: cookieName, url: url },
+        // With domain variations
+        { name: cookieName, url: `http://${domain}` },
+        { name: cookieName, url: `https://${domain}` },
+        { name: cookieName, url: `http://www.${domain}` },
+        { name: cookieName, url: `https://www.${domain}` },
+        // For subdomains
+        { name: cookieName, url: `http://.${domain}` },
+        { name: cookieName, url: `https://.${domain}` }
+    ];
+    
+    for (const attempt of deletionAttempts) {
+        try {
+            const removed = await chrome.cookies.remove(attempt);
+            if (removed) {
+                console.log(`✅ Deleted via: ${attempt.url}`);
+                return true;
+            }
+        } catch (e) {
+            // Continue to next attempt
+        }
+    }
+    
+    console.log(`❌ All deletion methods failed for: ${cookieName}`);
+    return false;
+}
+
+async function fallbackDeleteCookie(cookieName, tab) {
+    // Legacy JavaScript method as last resort
+    await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        function: (name) => {
+            // Aggressive cookie deletion
+            const paths = ['/', '/news', '/sport', '/weather', '/iplayer', '/music'];
+            const domains = [
+                window.location.hostname,
+                '.' + window.location.hostname,
+                'www.' + window.location.hostname
+            ];
+            
+            for (const path of paths) {
+                for (const domain of domains) {
+                    document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=${path}; domain=${domain};`;
+                    document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=${path}; domain=${domain}; secure`;
+                }
+            }
+        },
+        args: [cookieName]
+    });
 }
 
 async function clearAllStorage() {
     try {
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        const url = new URL(tab.url);
+        const domain = url.hostname;
         
+        // Clear localStorage and sessionStorage
         await chrome.scripting.executeScript({
             target: { tabId: tab.id },
             function: () => {
-                // Clear localStorage
                 localStorage.clear();
-                
-                // Clear sessionStorage
                 sessionStorage.clear();
-                
-                // Clear cookies
-                document.cookie.split(';').forEach(cookie => {
-                    const key = cookie.split('=')[0].trim();
-                    document.cookie = `${key}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
-                });
-                
-                console.log('🗑️ All storage cleared for this site');
+                console.log('🗑️ Cleared localStorage and sessionStorage');
             }
         });
-
-        // Refresh the data
+        
+        // Clear ALL cookies for this domain using Chrome API
+        const allCookies = await chrome.cookies.getAll({ domain: domain });
+        console.log(`🍪 Found ${allCookies.length} cookies to delete`);
+        
+        let deletedCount = 0;
+        for (const cookie of allCookies) {
+            try {
+                const removed = await chrome.cookies.remove({
+                    url: (cookie.secure ? 'https://' : 'http://') + cookie.domain + cookie.path,
+                    name: cookie.name
+                });
+                if (removed) deletedCount++;
+            } catch (error) {
+                console.error(`Failed to delete cookie: ${cookie.name}`, error);
+            }
+        }
+        
+        // Also try broader domain patterns
+        const domainPatterns = [
+            domain,
+            '.' + domain,
+            'www.' + domain
+        ];
+        
+        for (const pattern of domainPatterns) {
+            const patternCookies = await chrome.cookies.getAll({ domain: pattern });
+            for (const cookie of patternCookies) {
+                try {
+                    const removed = await chrome.cookies.remove({
+                        url: (cookie.secure ? 'https://' : 'http://') + cookie.domain + cookie.path,
+                        name: cookie.name
+                    });
+                    if (removed) deletedCount++;
+                } catch (error) {
+                    // Continue
+                }
+            }
+        }
+        
+        console.log(`✅ Deleted ${deletedCount} cookies`);
+        
+        // Refresh and show results
         loadStorageData();
-        alert('✅ All storage cleared! The page may need to be refreshed.');
+        
+        // Show success message
+        if (deletedCount > 0) {
+            alert(`✅ Successfully cleared storage and deleted ${deletedCount} cookies!`);
+        } else {
+            alert('✅ Storage cleared, but no deletable cookies found.');
+        }
         
     } catch (error) {
+        console.error('❌ Clear all error:', error);
         alert('Error clearing storage: ' + error.message);
     }
 }
