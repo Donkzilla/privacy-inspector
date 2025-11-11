@@ -28,6 +28,7 @@
             text-decoration: none;
             border-radius: 5px;
             font-weight: bold;
+            cursor: pointer;
         }
         .back a:hover {
             background: #5a6fd8;
@@ -36,6 +37,12 @@
             margin-top: 20px;
             font-size: 14px;
             color: #666;
+        }
+        .note {
+            font-size: 12px;
+            color: #888;
+            margin-top: 10px;
+            font-style: italic;
         }
     </style>
 </head>
@@ -78,19 +85,10 @@
     </div>
 
     <div class="back">
-        <a href="#" onclick="window.close(); return false;">← Close This Tab</a>
+        <a href="#" id="close-link">← Close This Tab</a>
+        <div class="note">(Or simply close this tab normally)</div>
     </div>
 
-    <script>
-        // Alternative close method for browsers that block window.close()
-        document.querySelector('.back a').addEventListener('click', function(e) {
-            e.preventDefault();
-            window.close();
-            // If window.close doesn't work, at least go back in history
-            if (!window.closed) {
-                window.history.back();
-            }
-        });
-    </script>
+    <script src="privacy.js"></script>
 </body>
 </html>
