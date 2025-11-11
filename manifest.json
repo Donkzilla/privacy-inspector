@@ -20,5 +20,9 @@
     "48": "icon48.png",
     "128": "icon128.png"
   },
-  "author": "Robert Campbell"
+  "author": "Robert Campbell",
+  "web_accessible_resources": [{
+    "resources": ["privacy.html"],
+    "matches": ["<all_urls>"]
+  }]
 }
